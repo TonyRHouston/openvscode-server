@@ -3,38 +3,40 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as assert from 'assert';
-import { EditOperation } from 'vs/editor/common/core/editOperation';
-import { Range } from 'vs/editor/common/core/range';
-import { TextModel } from 'vs/editor/common/model/textModel';
-import { LineInjectedText, ModelRawChange, RawContentChangedType } from 'vs/editor/common/model/textModelEvents';
-import { createTextModel } from 'vs/editor/test/common/editorTestUtils';
+import assert from 'assert';
+import { mock } from '../../../../base/test/common/mock.js';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
+import { EditOperation } from '../../../common/core/editOperation.js';
+import { Range } from '../../../common/core/range.js';
+import { InternalModelContentChangeEvent, LineInjectedText, ModelInjectedTextChangedEvent, ModelRawChange, RawContentChangedType } from '../../../common/textModelEvents.js';
+import { IViewModel } from '../../../common/viewModel.js';
+import { createTextModel } from '../testTextModel.js';
 
 suite('Editor Model - Injected Text Events', () => {
-	let thisModel: TextModel;
-
-	setup(() => {
-		thisModel = createTextModel('First Line\nSecond Line');
-	});
-
-	teardown(() => {
-		thisModel.dispose();
-	});
+	const store = ensureNoDisposablesAreLeakedInTestSuite();
 
 	test('Basic', () => {
+		const thisModel = store.add(createTextModel('First Line\nSecond Line'));
+
 		const recordedChanges = new Array<unknown>();
 
-		thisModel.onDidChangeContentOrInjectedText((e) => {
-			for (const change of e.changes) {
-				recordedChanges.push(mapChange(change));
+		const spyViewModel = new class extends mock<IViewModel>() {
+			override onDidChangeContentOrInjectedText(e: InternalModelContentChangeEvent | ModelInjectedTextChangedEvent) {
+				const changes = (e instanceof InternalModelContentChangeEvent ? e.rawContentChangedEvent.changes : e.changes);
+				for (const change of changes) {
+					recordedChanges.push(mapChange(change));
+				}
 			}
-		});
+			override emitContentChangeEvent(_e: InternalModelContentChangeEvent | ModelInjectedTextChangedEvent): void { }
+		};
+		thisModel.registerViewModel(spyViewModel);
 
 		// Initial decoration
 		let decorations = thisModel.deltaDecorations([], [{
 			options: {
 				after: { content: 'injected1' },
 				description: 'test1',
+				showIfCollapsed: true
 			},
 			range: new Range(1, 1, 1, 1),
 		}]);
@@ -51,12 +53,14 @@ suite('Editor Model - Injected Text Events', () => {
 			options: {
 				after: { content: 'injected1' },
 				description: 'test1',
+				showIfCollapsed: true
 			},
 			range: new Range(2, 1, 2, 1),
 		}, {
 			options: {
 				after: { content: 'injected2' },
 				description: 'test2',
+				showIfCollapsed: true
 			},
 			range: new Range(2, 2, 2, 2),
 		}]);
@@ -160,6 +164,8 @@ suite('Editor Model - Injected Text Events', () => {
 				kind: 'linesDeleted',
 			}
 		]);
+
+		thisModel.unregisterViewModel(spyViewModel);
 	});
 });
 

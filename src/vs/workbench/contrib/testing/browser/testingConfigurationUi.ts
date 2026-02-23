@@ -3,17 +3,18 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { groupBy } from 'vs/base/common/arrays';
-import { isDefined } from 'vs/base/common/types';
-import { ServicesAccessor } from 'vs/editor/browser/editorExtensions';
-import { localize } from 'vs/nls';
-import { CommandsRegistry } from 'vs/platform/commands/common/commands';
-import { QuickPickInput, IQuickPickItem, IQuickInputService, IQuickPickItemButtonEvent } from 'vs/platform/quickinput/common/quickInput';
-import { ThemeIcon } from 'vs/platform/theme/common/themeService';
-import { testingUpdateProfiles } from 'vs/workbench/contrib/testing/browser/icons';
-import { testConfigurationGroupNames } from 'vs/workbench/contrib/testing/common/constants';
-import { ITestRunProfile, TestRunProfileBitset } from 'vs/workbench/contrib/testing/common/testCollection';
-import { ITestProfileService } from 'vs/workbench/contrib/testing/common/testConfigurationService';
+import { groupBy } from '../../../../base/common/arrays.js';
+import { isDefined } from '../../../../base/common/types.js';
+import { ServicesAccessor } from '../../../../editor/browser/editorExtensions.js';
+import { localize } from '../../../../nls.js';
+import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
+import { QuickPickInput, IQuickPickItem, IQuickInputService, IQuickPickItemButtonEvent } from '../../../../platform/quickinput/common/quickInput.js';
+import { ThemeIcon } from '../../../../base/common/themables.js';
+import { testingUpdateProfiles } from './icons.js';
+import { testConfigurationGroupNames } from '../common/constants.js';
+import { InternalTestItem, ITestRunProfile, TestRunProfileBitset } from '../common/testTypes.js';
+import { canUseProfileWithTest, ITestProfileService } from '../common/testProfileService.js';
+import { DisposableStore } from '../../../../base/common/lifecycle.js';
 
 interface IConfigurationPickerOptions {
 	/** Placeholder text */
@@ -21,7 +22,7 @@ interface IConfigurationPickerOptions {
 	/** Show buttons to trigger configuration */
 	showConfigureButtons?: boolean;
 	/** Only show configurations from this controller */
-	onlyControllerId?: string;
+	onlyForTest?: InternalTestItem;
 	/** Only show this group */
 	onlyGroup?: TestRunProfileBitset;
 	/** Only show items which are configurable */
@@ -31,7 +32,7 @@ interface IConfigurationPickerOptions {
 function buildPicker(accessor: ServicesAccessor, {
 	onlyGroup,
 	showConfigureButtons = true,
-	onlyControllerId,
+	onlyForTest,
 	onlyConfigurable,
 	placeholder = localize('testConfigurationUi.pick', 'Pick a test profile to use'),
 }: IConfigurationPickerOptions) {
@@ -74,20 +75,15 @@ function buildPicker(accessor: ServicesAccessor, {
 		}
 	};
 
-	if (onlyControllerId !== undefined) {
-		const lookup = profileService.getControllerProfiles(onlyControllerId);
-		if (!lookup) {
-			return;
-		}
-
-		pushItems(lookup.profiles);
+	if (onlyForTest !== undefined) {
+		pushItems(profileService.getControllerProfiles(onlyForTest.controllerId).filter(p => canUseProfileWithTest(p, onlyForTest)));
 	} else {
 		for (const { profiles, controller } of profileService.all()) {
-			pushItems(profiles, controller.label.value);
+			pushItems(profiles, controller.label.get());
 		}
 	}
 
-	const quickpick = accessor.get(IQuickInputService).createQuickPick<IQuickPickItem & { profile: ITestRunProfile }>();
+	const quickpick = accessor.get(IQuickInputService).createQuickPick<IQuickPickItem & { profile: ITestRunProfile }>({ useSeparators: true });
 	quickpick.items = items;
 	quickpick.placeholder = placeholder;
 	return quickpick;
@@ -105,13 +101,16 @@ const triggerButtonHandler = (service: ITestProfileService, resolve: (arg: undef
 CommandsRegistry.registerCommand({
 	id: 'vscode.pickMultipleTestProfiles',
 	handler: async (accessor: ServicesAccessor, options: IConfigurationPickerOptions & {
-		selected?: ITestRunProfile[],
+		selected?: ITestRunProfile[];
 	}) => {
 		const profileService = accessor.get(ITestProfileService);
 		const quickpick = buildPicker(accessor, options);
 		if (!quickpick) {
 			return;
 		}
+
+		const disposables = new DisposableStore();
+		disposables.add(quickpick);
 
 		quickpick.canSelectMany = true;
 		if (options.selected) {
@@ -121,16 +120,16 @@ CommandsRegistry.registerCommand({
 		}
 
 		const pick = await new Promise<ITestRunProfile[] | undefined>(resolve => {
-			quickpick.onDidAccept(() => {
+			disposables.add(quickpick.onDidAccept(() => {
 				const selected = quickpick.selectedItems as readonly { profile?: ITestRunProfile }[];
 				resolve(selected.map(s => s.profile).filter(isDefined));
-			});
-			quickpick.onDidHide(() => resolve(undefined));
-			quickpick.onDidTriggerItemButton(triggerButtonHandler(profileService, resolve));
+			}));
+			disposables.add(quickpick.onDidHide(() => resolve(undefined)));
+			disposables.add(quickpick.onDidTriggerItemButton(triggerButtonHandler(profileService, resolve)));
 			quickpick.show();
 		});
 
-		quickpick.dispose();
+		disposables.dispose();
 		return pick;
 	}
 });
@@ -144,14 +143,17 @@ CommandsRegistry.registerCommand({
 			return;
 		}
 
+		const disposables = new DisposableStore();
+		disposables.add(quickpick);
+
 		const pick = await new Promise<ITestRunProfile | undefined>(resolve => {
-			quickpick.onDidAccept(() => resolve((quickpick.selectedItems[0] as { profile?: ITestRunProfile })?.profile));
-			quickpick.onDidHide(() => resolve(undefined));
-			quickpick.onDidTriggerItemButton(triggerButtonHandler(profileService, resolve));
+			disposables.add(quickpick.onDidAccept(() => resolve((quickpick.selectedItems[0] as { profile?: ITestRunProfile })?.profile)));
+			disposables.add(quickpick.onDidHide(() => resolve(undefined)));
+			disposables.add(quickpick.onDidTriggerItemButton(triggerButtonHandler(profileService, resolve)));
 			quickpick.show();
 		});
 
-		quickpick.dispose();
+		disposables.dispose();
 		return pick;
 	}
 });

@@ -3,12 +3,12 @@
 out/test/**
 out/**
 extension.webpack.config.js
-extension-browser.webpack.config.js
-yarn.lock
+package-lock.json
 src/**
 .gitignore
 vsc-extension-quickstart.md
-**/tsconfig.json
+**/tsconfig*.json
 **/tslint.json
 **/*.map
 **/*.ts
+packageMocks/

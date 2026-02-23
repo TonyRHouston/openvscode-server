@@ -5,5 +5,5 @@ out/**
 build/**
 extension.webpack.config.js
 extension-browser.webpack.config.js
-tsconfig.json
-yarn.lock
+tsconfig*.json
+package-lock.json

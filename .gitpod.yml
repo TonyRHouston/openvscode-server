@@ -1,27 +1,28 @@
 image:
   file: .gitpod.Dockerfile
 ports:
-  - port: 3000
+  - port: 9888
     onOpen: open-browser
 tasks:
   - init: |
-      yarn
-      yarn gitpod:init
+      npm ci
+      npm run server:init
     command: |
       gp sync-done init
       export NODE_ENV=development
       export VSCODE_DEV=1
-      yarn gulp watch-init
+      npm run watch
     name: watch app
   - command: |
       export NODE_ENV=development
       export VSCODE_DEV=1
       gp sync-await init
-      node out/server.js
+      ./scripts/code-server.sh  --without-connection-token
     name: run app
     openMode: split-right
 github:
   prebuilds:
+    branches: true
     pullRequestsFromForks: true
 vscode:
   extensions:

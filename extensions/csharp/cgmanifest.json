@@ -6,7 +6,7 @@
 				"git": {
 					"name": "dotnet/csharp-tmLanguage",
 					"repositoryUrl": "https://github.com/dotnet/csharp-tmLanguage",
-					"commitHash": "5f62efed7a0319dc41ee2ed227577633b52312a2"
+					"commitHash": "2e6860d87d4019b0b793b1e21e9e5c82185a01aa"
 				}
 			},
 			"license": "MIT",

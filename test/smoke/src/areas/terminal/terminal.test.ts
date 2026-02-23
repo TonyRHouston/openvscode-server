@@ -1,41 +1,53 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) Gitpod. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import minimist = require('minimist');
-import * as path from 'path';
-import { Application, Quality } from '../../../../automation';
-import { afterSuite, beforeSuite } from '../../utils';
+import { Application, Terminal, TerminalCommandId, Logger } from '../../../../automation';
+import { installAllHandlers } from '../../utils';
+import { setup as setupTerminalEditorsTests } from './terminal-editors.test';
+import { setup as setupTerminalInputTests } from './terminal-input.test';
+import { setup as setupTerminalPersistenceTests } from './terminal-persistence.test';
+import { setup as setupTerminalProfileTests } from './terminal-profiles.test';
+import { setup as setupTerminalTabsTests } from './terminal-tabs.test';
+import { setup as setupTerminalSplitCwdTests } from './terminal-splitCwd.test';
+import { setup as setupTerminalStickyScrollTests } from './terminal-stickyScroll.test';
+import { setup as setupTerminalShellIntegrationTests } from './terminal-shellIntegration.test';
 
-export function setup(opts: minimist.ParsedArgs) {
-	describe('Terminal', () => {
-		beforeSuite(opts);
+export function setup(logger: Logger) {
+	describe('Terminal', function () {
 
-		afterSuite(opts);
+		// Retry tests 3 times to minimize build failures due to any flakiness
+		this.retries(3);
 
-		it('shows terminal and runs command', async function () {
-			const app = this.app as Application;
-			await app.workbench.terminal.showTerminal();
-			await app.workbench.terminal.runCommand('ls');
-			await app.workbench.terminal.waitForTerminalText(lines => lines.some(l => l.includes('app.js')));
+		// Shared before/after handling
+		installAllHandlers(logger);
+
+		let app: Application;
+		let terminal: Terminal;
+		before(async function () {
+			// Fetch terminal automation API
+			app = this.app as Application;
+			terminal = app.workbench.terminal;
 		});
 
-		it('shows terminal and runs cli command', async function () {
-			const app = this.app as Application;
-
-			if (app.quality !== Quality.Dev) {
-				this.skip();
-			}
-
-			const rootPath = process.env['VSCODE_REPOSITORY'];
-			if (!rootPath) {
-				throw new Error('VSCODE_REPOSITORY env variable not found');
-			}
-
-			const cliPath = path.join(rootPath, 'out', 'server-cli.js');
-
-			await app.workbench.terminal.runCommand(`node ${cliPath} app.js`);
-			await app.workbench.editors.waitForActiveTab('app.js');
+		afterEach(async () => {
+			// Kill all terminals between every test for a consistent testing environment
+			await terminal.runCommand(TerminalCommandId.KillAll);
 		});
+
+		// https://github.com/microsoft/vscode/issues/216564
+		// The pty host can crash on Linux in smoke tests for an unknown reason. We need more user
+		// reports to investigate
+		setupTerminalEditorsTests({ skipSuite: process.platform === 'linux' });
+		setupTerminalInputTests({ skipSuite: process.platform === 'linux' });
+		setupTerminalPersistenceTests({ skipSuite: process.platform === 'linux' });
+		setupTerminalProfileTests({ skipSuite: process.platform === 'linux' });
+		setupTerminalTabsTests({ skipSuite: process.platform === 'linux' });
+		setupTerminalShellIntegrationTests({ skipSuite: process.platform === 'linux' });
+		setupTerminalStickyScrollTests({ skipSuite: true });
+		// https://github.com/microsoft/vscode/pull/141974
+		// Windows is skipped here as well as it was never enabled from the start
+		setupTerminalSplitCwdTests({ skipSuite: process.platform === 'linux' || process.platform === 'win32' });
 	});
 }

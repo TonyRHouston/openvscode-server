@@ -4,9 +4,9 @@ USER gitpod
 
 # We use latest major version of Node.js distributed VS Code. (see about dialog in your local VS Code)
 RUN bash -c ". .nvm/nvm.sh \
-    && nvm install 14 \
-    && nvm use 14 \
-    && nvm alias default 14"
+    && nvm install 22 \
+    && nvm use 22 \
+    && nvm alias default 22"
 
 RUN echo "nvm use default &>/dev/null" >> ~/.bashrc.d/51-nvm-fix
 
