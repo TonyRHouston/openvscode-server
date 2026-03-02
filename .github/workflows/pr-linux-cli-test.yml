@@ -7,40 +7,45 @@ on:
       rustup_toolchain:
         type: string
         required: true
-
 jobs:
   linux-cli-test:
     name: ${{ inputs.job_name }}
-    runs-on: [ self-hosted, 1ES.Pool=1es-vscode-oss-ubuntu-22.04-x64 ]
+    runs-on: ubuntu-latest
     env:
       RUSTUP_TOOLCHAIN: ${{ inputs.rustup_toolchain }}
     steps:
-      - name: Checkout microsoft/vscode
-        uses: actions/checkout@v4
+    - name: Checkout microsoft/vscode
+      uses: actions/checkout@v4
+    - name: Install Rust
+      run: 'set -e
 
-      - name: Install Rust
-        run: |
-          set -e
-          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain $RUSTUP_TOOLCHAIN
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain
+        $RUSTUP_TOOLCHAIN
 
-      - name: Set Rust version
-        run: |
-          set -e
-          rustup default $RUSTUP_TOOLCHAIN
-          rustup update $RUSTUP_TOOLCHAIN
-          rustup component add clippy
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Check Rust versions
-        run: |
-          set -e
-          rustc --version
-          cargo --version
+        '
+    - name: Set Rust version
+      run: 'set -e
 
-      - name: Clippy lint
-        run: cargo clippy -- -D warnings
-        working-directory: cli
+        rustup default $RUSTUP_TOOLCHAIN
 
-      - name: 🧪 Run unit tests
-        run: cargo test
-        working-directory: cli
+        rustup update $RUSTUP_TOOLCHAIN
+
+        rustup component add clippy
+
+        '
+    - name: Check Rust versions
+      run: 'set -e
+
+        rustc --version
+
+        cargo --version
+
+        '
+    - name: Clippy lint
+      run: cargo clippy -- -D warnings
+      working-directory: cli
+    - name: "\U0001F9EA Run unit tests"
+      run: cargo test
+      working-directory: cli
