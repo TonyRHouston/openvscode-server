@@ -1,13 +1,12 @@
-name: "Rich Navigation Indexing"
+name: Rich Navigation Indexing
 on:
-  pull_request:
+  pull_request: null
   push:
     branches:
-      - master
-
+    - master
 jobs:
   richnav:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Use Node.js
